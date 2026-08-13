@@ -1,21 +1,19 @@
-# claude-servicenow-docs - live ServiceNow documentation in Claude as a skill
+# ServiceNow Docs in Claude as a skill
 
-[![License: CC BY 4.0](https://img.shields.io/badge/License-CC%20BY%204.0-blue.svg)](LICENSE)
+[![License: CC0-1.0](https://img.shields.io/badge/License-CC0_1.0-lightgrey.svg)](LICENSE)
 [![ServiceNow docs.md](https://img.shields.io/badge/ServiceNow-docs.md-62D84E.svg?logo=servicenow&logoColor=white)](https://github.com/ServiceNow/ServiceNowDocs)
 
-A Claude plugin that gives your assistant authoritative ServiceNow product documentation —
-with nothing to clone, download, or keep in sync.
+Ask Claude a ServiceNow question, get an answer from ServiceNow's official documentation —
+fetched live, cited, and never from training-data recall.
 
-ServiceNow publishes its AI Platform docs as [`ServiceNow/ServiceNowDocs`](https://github.com/ServiceNow/ServiceNowDocs):
-one Markdown file per topic, plus a machine-readable `llms.txt` index. This plugin bundles the
-**Fetch** MCP server and a skill that reads that index first, pulls only the one or two topics
-it actually needs, and cites them back to you. Answers reflect what ServiceNow publishes
-today rather than training-data recall.
+The plugin bundles the **Fetch** MCP server plus a skill that reads the `llms.txt` index in
+[`ServiceNow/ServiceNowDocs`](https://github.com/ServiceNow/ServiceNowDocs), pulls the one or
+two topic files your question needs, and links them. Nothing to clone or keep in sync.
 
-## Install
+## Prerequisite: `uv`
 
-**1. Install [`uv`](https://docs.astral.sh/uv/)** — required, since the Fetch server launches
-via `uvx`. It provisions its own Python, so Python is not a separate prerequisite.
+Both clients need [`uv`](https://docs.astral.sh/uv/) — the Fetch server launches via `uvx`. It
+brings its own Python.
 
 ```bash
 # macOS / Linux
@@ -26,42 +24,21 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
 ```
 
-Reopen your terminal so `uvx` lands on `PATH`, then confirm with `uvx --version`.
+Reopen your terminal so `uvx` lands on `PATH`, then check `uvx --version`.
 
-**2. Add the marketplace and install the plugin** (Claude Code):
+## Claude Desktop
 
-```bash
-/plugin marketplace add bikemeardsley/claude-servicenow-docs
-/plugin install servicenow-docs@servicenow-docs
-```
+**1. Install the skill.** Customize → **Skills** → **+** next to *Personal plugins* → **+
+Create plugin** → **Add marketplace** → paste `bikemeardsley/claude-servicenow-docs` → **Sync**
+→ **Install**.
 
-**3. Restart Claude**, then run `/mcp` — a `fetch` server should be listed and connected. The
-first launch is slower while `uvx` downloads and caches the server.
+**2. Add the Fetch server to Desktop's config.** Desktop lists the bundled server under the
+plugin's **Connectors** panel but can't start it from there, so it needs adding once:
 
-If `fetch` isn't there, `uv` is almost certainly missing or not yet on `PATH`. On Claude
-Desktop the bundled connector needs one extra manual step — see
-[Claude Desktop setup](#claude-desktop-setup) below.
-
-## Claude Desktop setup
-
-**Claude Code users:** nothing to do here — the bundled Fetch server auto-starts with the
-plugin. Skip to [How it works](#how-it-works).
-
-**Known Claude Desktop limitation:** a plugin's bundled local (stdio) MCP server appears in
-the plugin's **Connectors** panel, but the Install button there doesn't activate it. This
-affects every plugin that bundles a local server — including Anthropic's own — and isn't
-specific to this one. The skill itself installs fine; the Fetch server just never starts, so
-lookups fail with the server "not connected."
-
-The one-time fix is to add the Fetch server to Claude Desktop's own config:
-
-1. **Fully quit Claude Desktop** — ⌘Q on macOS; on Windows quit from the system tray rather
-   than just closing the window. It rewrites its config on exit, so edits made while it's
-   running can be overwritten.
-2. Open **Settings → Developer → Edit Config**, which opens `claude_desktop_config.json`
-   (`~/Library/Application Support/Claude/` on macOS, `%APPDATA%\Claude\` on Windows).
-3. Add the `fetch` entry inside the existing `mcpServers` object — **merge it in, don't
-   overwrite** any servers already there:
+1. **Fully quit Claude Desktop** — ⌘Q on macOS, or quit from the system tray on Windows. It
+   rewrites its config on exit.
+2. Open **Settings → Developer → Edit Config** to open `claude_desktop_config.json`.
+3. Merge the `fetch` entry into `mcpServers`, keeping any servers already there:
 
    ```json
    {
@@ -74,63 +51,41 @@ The one-time fix is to add the Fetch server to Claude Desktop's own config:
    }
    ```
 
-4. Save and relaunch Claude Desktop. The `servicenow-docs` skill now has a live Fetch server
-   to call.
+4. Save and relaunch.
 
-This is the same server definition the plugin ships in `.mcp.json`, [`mcp<2` pin](#why-mcp2-is-pinned)
-included — MCP Python SDK 2.0 removed the `@server.list_tools()` API that `mcp-server-fetch`
-relies on, so an unpinned launch crashes on startup.
+Keep the `mcp<2` pin exactly as written — `mcp-server-fetch` crashes on startup under MCP
+Python SDK 2.0.
 
-**Verify (optional):** run `uvx --with "mcp<2" mcp-server-fetch` in a terminal. Silence is
-healthy — it's an stdio server waiting for a client, so press Ctrl+C to exit. An error means
-`uv` isn't installed or isn't on `PATH`.
+## Claude Code
+
+```bash
+/plugin marketplace add bikemeardsley/claude-servicenow-docs
+/plugin install servicenow-docs@servicenow-docs
+```
+
+Restart Claude Code, then run `/mcp` — `fetch` should be listed and connected. No config
+editing needed; the bundled server starts on its own. The first launch is slower while `uvx`
+caches it.
 
 ## How it works
-
-The plugin bundles the Fetch MCP server as the **`fetch` connector**, and the skill routes
-every retrieval through it: anything Claude cites must come from a `fetch` call made during
-that conversation, never from recall. Ask it to "search the ServiceNow docs for X" and it
-looks X up rather than answering from memory and offering to check.
-
-The skill points Claude at two locations and one rule: **read the index before fetching.**
 
 | | |
 |---|---|
 | Index | `https://raw.githubusercontent.com/ServiceNow/ServiceNowDocs/main/llms.txt` |
 | Raw file base | `https://raw.githubusercontent.com/ServiceNow/ServiceNowDocs/main/` |
 
-Claude reads `llms.txt`, picks the 1–3 entries matching your question, fetches those topic
-files, answers from them, and links the source. Paths are never guessed from memory — the
-docs get reorganized, and the index is the only reliable map.
+Claude reads the index, picks the 1–3 entries matching your question, fetches those topic
+files, answers from them, and links the source. Paths always come from the index — the docs
+get reorganized, so guessing from memory doesn't work.
 
-## Why `mcp<2` is pinned
-
-`.mcp.json` launches the server as `uvx --with "mcp<2" mcp-server-fetch`. Under MCP Python
-SDK 2.0 the Fetch server crashes on launch with:
-
-```
-AttributeError: 'Server' object has no attribute 'list_tools'
-```
-
-The pin holds the SDK on the 1.x line so the server starts cleanly. Leave it in place until
-`mcp-server-fetch` ships a 2.0-compatible release.
-
-## Tradeoffs
-
-Retrieval is **online and file-at-a-time**:
-
-- ✅ Always current — reflects the docs as ServiceNow publishes them, nothing to re-sync.
-- ✅ Light on context — 1–3 topic files per question, not the whole corpus.
-- ❌ Requires internet access.
-- ❌ No whole-corpus search and no offline use. If you need either, clone the docs repo
-  locally and point a filesystem or git MCP server at it instead.
+Retrieval is online and file-at-a-time, so it needs internet access and reads the `main`
+branch live.
 
 ## Pairs with GlideGrail.md
 
-[**GlideGrail.md**](https://github.com/bikemeardsley/GlideGrail.md) is the judgment layer —
-how you want ServiceNow code written (naming, server/client patterns, Flow Designer, ACLs,
-integrations, Service Portal, ATF). This plugin is the reference layer — what the platform
-actually does. They're separate installs and work well together:
+[**GlideGrail.md**](https://github.com/bikemeardsley/GlideGrail.md) is the judgment layer — how
+you want ServiceNow code written. This is the reference layer — what the platform actually
+does. Separate installs, good together:
 
 ```bash
 /plugin marketplace add bikemeardsley/GlideGrail.md
@@ -139,8 +94,8 @@ actually does. They're separate installs and work well together:
 
 ## License
 
-Licensed under a [Creative Commons Attribution 4.0 International License (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/).
+[CC0 1.0 Universal](LICENSE) — public domain. Use it however you like, no attribution needed.
 
-The ServiceNow documentation this plugin retrieves is published by ServiceNow under its own
-terms — see [`ServiceNow/ServiceNowDocs`](https://github.com/ServiceNow/ServiceNowDocs). This
-project is not affiliated with or endorsed by ServiceNow.
+The documentation this plugin retrieves is published by ServiceNow under its own terms; see
+[`ServiceNow/ServiceNowDocs`](https://github.com/ServiceNow/ServiceNowDocs). Not affiliated
+with or endorsed by ServiceNow.
