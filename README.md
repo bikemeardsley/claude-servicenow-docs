@@ -38,7 +38,52 @@ Reopen your terminal so `uvx` lands on `PATH`, then confirm with `uvx --version`
 **3. Restart Claude**, then run `/mcp` — a `fetch` server should be listed and connected. The
 first launch is slower while `uvx` downloads and caches the server.
 
-If `fetch` isn't there, `uv` is almost certainly missing or not yet on `PATH`.
+If `fetch` isn't there, `uv` is almost certainly missing or not yet on `PATH`. On Claude
+Desktop the bundled connector needs one extra manual step — see
+[Claude Desktop setup](#claude-desktop-setup) below.
+
+## Claude Desktop setup
+
+**Claude Code users:** nothing to do here — the bundled Fetch server auto-starts with the
+plugin. Skip to [How it works](#how-it-works).
+
+**Known Claude Desktop limitation:** a plugin's bundled local (stdio) MCP server appears in
+the plugin's **Connectors** panel, but the Install button there doesn't activate it. This
+affects every plugin that bundles a local server — including Anthropic's own — and isn't
+specific to this one. The skill itself installs fine; the Fetch server just never starts, so
+lookups fail with the server "not connected."
+
+The one-time fix is to add the Fetch server to Claude Desktop's own config:
+
+1. **Fully quit Claude Desktop** — ⌘Q on macOS; on Windows quit from the system tray rather
+   than just closing the window. It rewrites its config on exit, so edits made while it's
+   running can be overwritten.
+2. Open **Settings → Developer → Edit Config**, which opens `claude_desktop_config.json`
+   (`~/Library/Application Support/Claude/` on macOS, `%APPDATA%\Claude\` on Windows).
+3. Add the `fetch` entry inside the existing `mcpServers` object — **merge it in, don't
+   overwrite** any servers already there:
+
+   ```json
+   {
+     "mcpServers": {
+       "fetch": {
+         "command": "uvx",
+         "args": ["--with", "mcp<2", "mcp-server-fetch"]
+       }
+     }
+   }
+   ```
+
+4. Save and relaunch Claude Desktop. The `servicenow-docs` skill now has a live Fetch server
+   to call.
+
+This is the same server definition the plugin ships in `.mcp.json`, [`mcp<2` pin](#why-mcp2-is-pinned)
+included — MCP Python SDK 2.0 removed the `@server.list_tools()` API that `mcp-server-fetch`
+relies on, so an unpinned launch crashes on startup.
+
+**Verify (optional):** run `uvx --with "mcp<2" mcp-server-fetch` in a terminal. Silence is
+healthy — it's an stdio server waiting for a client, so press Ctrl+C to exit. An error means
+`uv` isn't installed or isn't on `PATH`.
 
 ## How it works
 
