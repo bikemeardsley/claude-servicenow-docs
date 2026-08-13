@@ -42,6 +42,11 @@ If `fetch` isn't there, `uv` is almost certainly missing or not yet on `PATH`.
 
 ## How it works
 
+The plugin bundles the Fetch MCP server as the **`fetch` connector**, and the skill routes
+every retrieval through it: anything Claude cites must come from a `fetch` call made during
+that conversation, never from recall. Ask it to "search the ServiceNow docs for X" and it
+looks X up rather than answering from memory and offering to check.
+
 The skill points Claude at two locations and one rule: **read the index before fetching.**
 
 | | |

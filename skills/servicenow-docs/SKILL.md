@@ -1,68 +1,86 @@
 ---
 name: servicenow-docs
-description: Use this skill whenever you need authoritative ServiceNow product documentation - platform capabilities, APIs, application development, security/ACLs, ITSM/ITOM/HRSD, Flow Designer, integrations, Service Portal, scripting, and more. It reads ServiceNow's official documentation (published as Markdown for LLMs) live from GitHub via the Fetch MCP server, so answers reflect the current published docs. Prefer this skill over training-data recall for anything ServiceNow-specific, version-sensitive, or where an authoritative citation is helpful.
+description: Search ServiceNow's official product documentation live, using the bundled Fetch connector. Use this skill whenever you need authoritative ServiceNow documentation - platform capabilities, APIs, application development, security/ACLs, ITSM/ITOM/HRSD, Flow Designer, integrations, Service Portal, scripting, and more - and always when the user explicitly asks to "search the ServiceNow docs", "check the docs", "look this up in the ServiceNow documentation", or cites a doc topic. It reads ServiceNow's official documentation (published as Markdown for LLMs) live from GitHub, so answers reflect the current published docs. Prefer this skill over training-data recall for anything ServiceNow-specific, version-sensitive, or where an authoritative citation is helpful.
 ---
 
-# ServiceNow Docs (live, index-first)
+# ServiceNow Docs (via the Fetch connector)
 
-This skill gives you authoritative, up-to-date ServiceNow documentation by fetching it
-directly from the official `ServiceNow/ServiceNowDocs` repository on GitHub. The docs are
-published as one Markdown file per topic and include a machine-readable index (`llms.txt`)
-designed for exactly this "read index, then fetch the file you need" workflow.
+This skill answers ServiceNow questions from the official
+`ServiceNow/ServiceNowDocs` repository - the docs ServiceNow publishes as one Markdown file
+per topic, with a machine-readable `llms.txt` index designed for "read the index, then fetch
+the file you need" retrieval.
 
-You have access to the **Fetch** MCP server (bundled with this plugin). Use it to retrieve
-URLs and read them as Markdown.
+## Use the Fetch connector for every retrieval
 
-## If you have no fetch tool
+This plugin bundles the **Fetch** MCP server, exposed as the **`fetch` connector**. It
+provides a `fetch` tool that takes a `url` and returns the page as Markdown.
 
-If no fetch/web-retrieval tool is available to you, the plugin's bundled MCP server is not
-running - almost always because `uv` (which provides `uvx`) is not installed. Say so plainly
-and give the user the fix:
+**Every piece of content you cite in an answer must come from a `fetch` call made during this
+conversation.** When the user invokes this skill, they are explicitly asking you to consult
+the live documentation - so:
 
-1. Install `uv` - macOS/Linux: `curl -LsSf https://astral.sh/uv/install.sh | sh`;
-   Windows PowerShell: `powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"`
-2. Reopen the terminal so `uvx` is on `PATH`.
-3. Restart Claude, then run `/mcp` - a `fetch` server should be listed and connected.
-
-**Do not silently answer from memory as if you had consulted the docs.** If you answer
-anyway, state up front that the live documentation was unavailable and the answer comes from
-prior knowledge, which may be outdated or wrong on version-specific details.
+- **Always call `fetch` first.** Do not answer a ServiceNow question from memory and then
+  offer to look it up. Look it up, then answer.
+- **Never reconstruct doc content from recall** and present it as documentation, even when
+  you are confident. Confidence is not a citation.
+- **Never guess or fabricate a URL or file path.** Every path comes from the index (below).
+- If the docs contradict your prior knowledge, **the fetched docs win** - say so plainly if
+  the difference matters to the user.
 
 ## Base locations
 
-- **Index (always read this first):**
-  `https://raw.githubusercontent.com/ServiceNow/ServiceNowDocs/main/llms.txt`
-- **Raw file base** (for any path you find in the index):
-  `https://raw.githubusercontent.com/ServiceNow/ServiceNowDocs/main/`
-- **Human-browsable repo** (for citing back to the user):
-  `https://github.com/ServiceNow/ServiceNowDocs`
+| Purpose | URL |
+|---|---|
+| **Index** - always fetch first | `https://raw.githubusercontent.com/ServiceNow/ServiceNowDocs/main/llms.txt` |
+| **Raw file base** - join with any path from the index | `https://raw.githubusercontent.com/ServiceNow/ServiceNowDocs/main/` |
+| **Human-browsable repo** - for citing back to the user | `https://github.com/ServiceNow/ServiceNowDocs` |
 
-## Retrieval workflow (follow this order)
+## Retrieval workflow
 
-1. **Fetch the index first.** Retrieve `llms.txt` and scan it for the topic(s) that match
-   the user's question. The index lists topics with short descriptions and their file paths.
-2. **Resolve to specific file(s).** Pick the 1-3 most relevant entries. Build each file's
-   raw URL by joining the raw file base with the path from the index.
-3. **Fetch the file(s).** Retrieve the actual Markdown topic file(s) with the Fetch server.
-4. **Answer from the fetched content**, and cite the topic (and its GitHub URL) so the user
-   can open the source. If the docs and your prior knowledge disagree, trust the fetched docs.
+1. **`fetch` the index.** Retrieve `llms.txt` and scan it for topics matching the question.
+   The index lists topics with short descriptions and their file paths.
+2. **Resolve to specific file(s).** Pick the 1-3 most relevant entries and build each raw URL
+   by joining the raw file base with the path from the index.
+3. **`fetch` the file(s).** Retrieve the actual Markdown topic file(s).
+4. **Answer from the fetched content**, and cite each topic with its GitHub URL so the user
+   can open the source.
 
-## Good practices
+For multi-part questions, resolve each sub-topic against the index separately, then fetch each
+relevant file.
 
-- **Always index-first.** Do not guess file paths from memory; read `llms.txt` and use the
-  paths it gives you. Paths and topic organization change as the docs are refreshed.
-- **Fetch narrowly.** Grab only the files you actually need (usually 1-3), not large swaths
-  of the corpus, to keep context focused.
-- **Multi-part questions:** resolve each sub-topic against the index separately, then fetch
-  each relevant file.
-- **If a fetch fails or a path 404s,** re-read the index (the topic may have moved) and try
-  the updated path before giving up.
-- **Cite your source.** Point the user to the topic's GitHub URL so they can verify or read more.
+## Handling long topic files
+
+The `fetch` tool truncates by default (roughly 5,000 characters) and reports when content was
+cut short. ServiceNow topic files are often longer.
+
+- Raise `max_length` when you need more of a document in one call.
+- Use `start_index` to continue from where a truncated response stopped, and keep paginating
+  until you have the section you need.
+- **Never answer from a half-read document as though you read all of it.** If you stopped
+  early, either paginate or tell the user which part you read.
+
+## Failure handling
+
+- **A path 404s:** re-fetch `llms.txt` - the topic likely moved - and retry with the updated
+  path before giving up.
+- **No `fetch` tool available to you:** the connector is not running. Say so instead of
+  answering from memory, and point the user at the fix for their client:
+  - **Claude Code:** the server launches via `uvx`, so `uv` must be installed -
+    `curl -LsSf https://astral.sh/uv/install.sh | sh` (macOS/Linux) or
+    `powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"`
+    (Windows). Reopen the terminal, restart Claude, then check `/mcp` for a connected `fetch`
+    server.
+  - **Claude desktop app:** open the plugin's **Connectors** tab and connect `fetch`, then
+    restart the app.
+- If you answer anyway despite having no `fetch` tool, **state up front** that the live
+  documentation was unavailable and the answer comes from prior knowledge, which may be
+  outdated or wrong on version-specific details.
 
 ## Notes
 
-- This is **online, file-at-a-time** retrieval. It requires internet access and reads the
-  `main` branch live, so it reflects the latest published docs (the corpus is refreshed
-  periodically by ServiceNow). There is no local copy to keep in sync.
-- If a user needs **offline** access or **whole-corpus search**, that requires a local clone
-  of the repo with a filesystem/git MCP server instead - out of scope for this skill.
+- Retrieval is online and file-at-a-time against the `main` branch, so it reflects the latest
+  published docs. There is no local copy to keep in sync.
+- Fetch narrowly - usually 1-3 files per question, not large swaths of the corpus - to keep
+  context focused.
+- Offline access or whole-corpus search would require a local clone with a filesystem/git MCP
+  server instead; that is out of scope for this skill.
