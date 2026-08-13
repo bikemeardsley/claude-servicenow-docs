@@ -1,0 +1,15 @@
+{
+  "name": "servicenow-docs",
+  "owner": {
+    "name": "Michael Beardsley",
+    "url": "https://github.com/bikemeardsley"
+  },
+  "description": "Live ServiceNow product documentation for Claude, read straight from ServiceNow's official docs repo.",
+  "plugins": [
+    {
+      "name": "servicenow-docs",
+      "source": "./",
+      "description": "Live, searchable access to ServiceNow's official AI Platform documentation. Reads the ServiceNowDocs repo's llms.txt index and fetches individual topic files on demand from GitHub - always current, no local clone required. Requires uv (a one-line install) so the bundled Fetch MCP server can start."
+    }
+  ]
+}
