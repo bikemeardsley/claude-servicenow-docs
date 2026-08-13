@@ -70,8 +70,17 @@ cut short. ServiceNow topic files are often longer.
     `powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"`
     (Windows). Reopen the terminal, restart Claude, then check `/mcp` for a connected `fetch`
     server.
-  - **Claude desktop app:** open the plugin's **Connectors** tab and connect `fetch`, then
-    restart the app.
+  - **Claude desktop app:** the bundled connector cannot be activated from the plugin's
+    Connectors panel, so the Fetch server has to be added to Claude Desktop's own config
+    once. Tell the user to fully quit Claude Desktop, open **Settings → Developer → Edit
+    Config**, merge this into the `mcpServers` object in `claude_desktop_config.json`
+    (keeping any servers already there), then relaunch:
+
+    ```json
+    "fetch": { "command": "uvx", "args": ["--with", "mcp<2", "mcp-server-fetch"] }
+    ```
+
+    This also requires `uv` — same install commands as above.
 - If you answer anyway despite having no `fetch` tool, **state up front** that the live
   documentation was unavailable and the answer comes from prior knowledge, which may be
   outdated or wrong on version-specific details.
