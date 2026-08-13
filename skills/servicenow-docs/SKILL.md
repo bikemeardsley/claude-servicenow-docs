@@ -23,34 +23,26 @@ the live documentation - so:
   offer to look it up. Look it up, then answer.
 - **Never reconstruct doc content from recall** and present it as documentation, even when
   you are confident. Confidence is not a citation.
-- **Never guess or fabricate a URL or file path.** Every path comes from the index (below).
+- **Never present content as read without a successful `fetch` confirming it.** Deriving a
+  candidate path - from a search result, a landing-page link, or a directory listing - is fine
+  and expected. Treating an unconfirmed derived path as documentation is not: if the fetch
+  404s, that path told you nothing.
 - If the docs contradict your prior knowledge, **the fetched docs win** - say so plainly if
   the difference matters to the user.
 
-## Resolve the branch first - always
-
-**Documentation content does not live on `main`.** That branch carries only repo-level files
-(`README.md`, `LICENSE`, `llms.txt`) and a `markdown/` directory holding nothing but a
-placeholder. The actual docs live on release-family branches - `australia`, `zurich`,
-`yokohama`, `xanadu` - and which one is current rotates as ServiceNow ships new families.
-
-**Before the first content fetch in a conversation, resolve `{branch}`:**
-
-1. `fetch` `https://api.github.com/repos/ServiceNow/ServiceNowDocs` and read the
-   `default_branch` field. That value is `{branch}` for the rest of the conversation.
-2. If the user names a release explicitly ("on Xanadu", "we're still on Yokohama"), use that
-   family name as `{branch}` for that request instead.
-3. **Never hardcode a family name**, and never fall back to `main` - it has no content.
-
-Resolve once per conversation and reuse it; don't re-resolve before every fetch.
-
 ## Base locations
+
+`HEAD` works as a branch alias everywhere on this repo and always resolves to the current
+release family (`australia` today; ServiceNow rotates it as new families ship). **Use the
+literal string `HEAD` in every URL below.** There is no branch to resolve, and no reason to
+call `api.github.com/repos/ServiceNow/ServiceNowDocs` for `default_branch`.
 
 | Purpose | URL |
 |---|---|
-| **Branch index** - fetch right after resolving `{branch}` | `https://raw.githubusercontent.com/ServiceNow/ServiceNowDocs/{branch}/llms.txt` |
-| **Raw file base** - join with any path | `https://raw.githubusercontent.com/ServiceNow/ServiceNowDocs/{branch}/` |
-| **Directory listing** - files within one publication | `https://api.github.com/repos/ServiceNow/ServiceNowDocs/contents/markdown/{publication}?ref={branch}` |
+| **Topic file** - the thing you actually want | `https://raw.githubusercontent.com/ServiceNow/ServiceNowDocs/HEAD/markdown/{publication}/{file}.md` |
+| **Landing page** - curated hub for a subtopic | `https://raw.githubusercontent.com/ServiceNow/ServiceNowDocs/HEAD/markdown/{publication}/{topic}-landing.md` |
+| **Directory listing** - last resort, see workflow | `https://api.github.com/repos/ServiceNow/ServiceNowDocs/git/trees/HEAD:markdown/{publication}` |
+| **Publication list** - orientation only | `https://raw.githubusercontent.com/ServiceNow/ServiceNowDocs/HEAD/llms.txt` |
 | **Human-browsable repo** - for citing back to the user | `https://github.com/ServiceNow/ServiceNowDocs` |
 
 Prefer `raw.githubusercontent.com` over `api.github.com` wherever both would work: the GitHub
@@ -59,23 +51,40 @@ listings will stall retrieval mid-conversation.
 
 ## Retrieval workflow
 
-1. **`fetch` the branch index** (`{branch}/llms.txt`, about 9 KB). It lists all ~56
-   publications with human-readable names and a direct URL each - "Building applications" is
-   `markdown/application-development/`, "App development and low-code" is
-   `markdown/hyperautomation-low-code/`. Pick the 1-2 publications matching the question.
-2. **Locate the topic file inside that publication - but do not fetch the publication's
-   `index.md` to do it.** Those are complete tables of contents and some are enormous:
-   `application-development/index.md` is roughly 624 KB, far more than the topic file you
-   actually want. Fetch the directory listing instead, which returns descriptive file names
-   (`ACL-access-checks.md`, `activate-RCA.md`, ...). Large publications run past 300 files, so
-   the listing may truncate - raise `max_length` and page with `start_index`; entries are
-   alphabetical, which makes paging predictable. If you have a web search tool, searching the
-   topic plus "ServiceNowDocs github" is often the fastest way to land on the exact file.
-3. **`fetch` the resolved file(s)** as `{raw file base}markdown/{publication}/{file}.md`.
-4. **Answer from the fetched content**, and cite each topic with its GitHub URL so the user
-   can open the source.
+Ordered cheapest-first. **Stop as soon as a `fetch` returns content.**
 
-For multi-part questions, resolve each sub-topic separately, then fetch each relevant file.
+1. **Search, then derive the path.** If you have a web search tool, search the topic plus
+   "ServiceNow" or "servicenow.com/docs". Results are dominated by
+   `servicenow.com/docs/r/{publication}/{slug}.html` URLs. **Do not fetch that page** - it is a
+   JavaScript app that returns nothing readable. Instead derive
+   `https://raw.githubusercontent.com/ServiceNow/ServiceNowDocs/HEAD/markdown/{publication}/{slug}.md`
+   and fetch that. The slug usually maps exactly to the filename, but not always: it is a
+   candidate, not a citation, until the fetch succeeds. A 404 means go to step 2 - **not** a
+   second guess at the URL.
+2. **Probe for a landing page.** Try
+   `https://raw.githubusercontent.com/ServiceNow/ServiceNowDocs/HEAD/markdown/{publication}/{topic}-landing.md`
+   with your best guess at the publication and topic slug. Many publications carry these
+   curated hubs - short pages of links pointing at the right sub-pages
+   (`order-management/configure-price-quote-landing.md` is a real one). One cheap fetch, and a
+   hit usually names the exact file you need. Same rule: a 404 means move on, not guess again.
+3. **List the publication directory - last resort.** `fetch`
+   `https://api.github.com/repos/ServiceNow/ServiceNowDocs/git/trees/HEAD:markdown/{publication}`,
+   pick the file from the returned paths, then fetch it via the topic-file URL pattern.
+   **Omit the `recursive` parameter entirely.** GitHub checks only whether it is *present*, not
+   what it is set to - `?recursive=0` and `?recursive=false` both return the full recursive
+   tree, 49,498 entries instead of 56 on `markdown/`.
+   Even done correctly this is expensive: large publications run past 1,000 files
+   (`order-management` is 1,041, about 274,000 characters of JSON), so raise `max_length` and
+   page with `start_index`, or narrow down the publication first.
+4. **`llms.txt` for orientation only.** It lists all ~56 publications with human-readable
+   names - "App development and low-code" is `markdown/hyperautomation-low-code/`. Use it for
+   "what does the documentation cover" questions, or when you can't guess which publication
+   owns a topic. It is **not** the first step for a known topic. It runs about 9,200
+   characters, so pass `max_length` of at least 12,000 or the first call truncates and costs
+   you a second round-trip.
+
+Then **answer from the fetched content**, and cite each topic with its GitHub URL so the user
+can open the source. For multi-part questions, resolve each sub-topic separately.
 
 ## Handling long topic files
 
@@ -90,14 +99,20 @@ cut short. ServiceNow topic files are often longer.
 
 ## Failure handling
 
-- **A path 404s:** re-fetch the branch index (`{branch}/llms.txt`) - the topic likely moved -
-  and retry with the updated path before giving up.
-- **Everything 404s, or a listing returns only a `README.md`:** you are almost certainly still
-  pointed at `main`. Re-resolve `{branch}` via `default_branch` and retry.
+Walk the workflow in order; each failure has exactly one next move.
+
+- **A slug-derived path 404s (step 1):** fall through to the landing-page probe (step 2). Do
+  not guess a second URL from the same search result, and do not re-run the search with
+  different terms.
+- **The landing-page probe 404s (step 2):** escalate to the directory listing (step 3). That
+  listing is authoritative for what files exist in a publication - once you have it, you are
+  no longer guessing.
+- **The listing has nothing relevant:** you probably picked the wrong publication. Fetch
+  `llms.txt` (step 4) for the full publication list, then retry step 3 against the right one.
 - **A GitHub API call returns 403 with a rate-limit message:** the 60/hour unauthenticated
-  budget is spent. Switch to `raw.githubusercontent.com` - the branch index and the topic files
-  themselves need no API call - and tell the user directory listings are unavailable until the
-  hour rolls over.
+  budget is spent, so step 3 is unavailable until the hour rolls over. Steps 1, 2 and 4 need no
+  API call - they are all `raw.githubusercontent.com` - so keep working from those and tell the
+  user directory listings are temporarily out.
 - **No `fetch` tool available to you:** the connector is not running. Say so instead of
   answering from memory, and point the user at the fix for their client:
   - **Claude Code:** the server launches via `uvx`, so `uv` must be installed -
@@ -122,13 +137,17 @@ cut short. ServiceNow topic files are often longer.
 
 ## Notes
 
-- Retrieval is online and file-at-a-time against the resolved release branch, so it reflects
-  the currently published docs. There is no local copy to keep in sync.
-- ServiceNow keeps only the three most recent families (four during an early-availability
-  window) and deletes the oldest branch at GA, so a family the user names may no longer exist.
+- Retrieval is online and file-at-a-time against `HEAD`, so it reflects the currently
+  published docs. There is no local copy to keep in sync.
+- **If the user explicitly names an older release** ("we're still on Xanadu"), substitute that
+  family name for `HEAD` in the URL patterns. ServiceNow keeps only the three most recent
+  families (four during an early-availability window) and deletes the oldest branch at GA, so
+  a family they name may no longer exist.
 - Do not try to read `servicenow.com/docs` directly - it is a JavaScript app that returns no
   readable content. The repo is the only machine-readable source.
 - Fetch narrowly - usually 1-3 files per question, not large swaths of the corpus - to keep
   context focused.
-- Offline access or whole-corpus search would require a local clone with a filesystem/git MCP
-  server instead; that is out of scope for this skill.
+- **If a synced local clone is available** through a filesystem or git MCP server, prefer it
+  for open-ended discovery: real glob and grep across the whole corpus, with no network
+  round-trips, is structurally cheaper than any sequence of fetches. This skill remains the
+  right choice when the content must be guaranteed live, or when no local clone exists.

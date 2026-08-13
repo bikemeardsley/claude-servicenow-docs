@@ -70,18 +70,18 @@ caches it.
 ## How it works
 
 ServiceNow ships each release family as its own branch (`australia`, `zurich`, `yokohama`,
-`xanadu`) — `main` holds no documentation at all. So the skill resolves the repo's
-`default_branch` first, then works from that branch:
+`xanadu`) — `main` holds no documentation at all. The skill uses `HEAD`, which always points
+at the current family, so it keeps working across release cutovers with no update:
 
-| | |
-|---|---|
-| Branch index | `.../ServiceNowDocs/{branch}/llms.txt` — ~56 publications, human-readable names |
-| Raw file base | `.../ServiceNowDocs/{branch}/markdown/{publication}/{file}.md` |
+```
+raw.githubusercontent.com/ServiceNow/ServiceNowDocs/HEAD/markdown/{publication}/{file}.md
+```
 
-Claude picks the publication matching your question, finds the topic file, fetches it, and
-links the source. Paths always come from the index — the docs get reorganized, so guessing
-from memory doesn't work. Because the branch is resolved live, this keeps working across
-release cutovers with no update to the skill.
+Claude finds the topic file cheapest-first — deriving the path from a search result, probing
+for a curated landing page, and only listing the publication directory as a last resort — then
+fetches it and links the source. A derived path is only a candidate: if the fetch doesn't
+return content, it isn't cited. Mention you're on an older release and it substitutes that
+family for `HEAD`.
 
 Retrieval is online and file-at-a-time, so it needs internet access.
 
