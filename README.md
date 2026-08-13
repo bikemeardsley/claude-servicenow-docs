@@ -39,7 +39,7 @@ Reopen your terminal so `uvx` lands on `PATH`, then check `uvx --version`.
 **2. Add the Fetch mcp server to Claude Desktop's config json.** Desktop lists the bundled server under the
 plugin's **Connectors** panel but can't start it from there, so it needs adding once:
 
-1. Open **Cutomize → Developer → Edit Config** to open `claude_desktop_config.json`.
+1. Open **Customize → Developer → Edit Config** to open `claude_desktop_config.json`.
 2. Merge the `fetch` entry into `mcpServers`, keeping any servers already there:
 
    ```json
