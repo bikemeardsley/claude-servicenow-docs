@@ -1,4 +1,4 @@
-# servicenow-docs — live ServiceNow documentation in Claude
+# claude-servicenow-docs - live ServiceNow documentation in Claude as a skill
 
 [![License: CC BY 4.0](https://img.shields.io/badge/License-CC%20BY%204.0-blue.svg)](LICENSE)
 [![ServiceNow docs.md](https://img.shields.io/badge/ServiceNow-docs.md-62D84E.svg?logo=servicenow&logoColor=white)](https://github.com/ServiceNow/ServiceNowDocs)
