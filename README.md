@@ -28,17 +28,19 @@ Reopen your terminal so `uvx` lands on `PATH`, then check `uvx --version`.
 
 ## Claude Desktop
 
-**1. Install the skill.** Customize → **Skills** → **+** next to *Personal plugins* → **+
-Create plugin** → **Add marketplace** → paste `bikemeardsley/claude-servicenow-docs` → **Sync**
-→ **Install**.
+**1. Install the skill:**
 
-**2. Add the Fetch server to Desktop's config.** Desktop lists the bundled server under the
+1. Go to Customize → Plugins → Add → Add marketplace
+2. Paste `bikemeardsley/claude-servicenow-docs`
+3. Set Sync automatically = true
+4. Click Sync
+5. Click the + to install the ServiceNow docs plugin
+
+**2. Add the Fetch mcp server to Claude Desktop's config json.** Desktop lists the bundled server under the
 plugin's **Connectors** panel but can't start it from there, so it needs adding once:
 
-1. **Fully quit Claude Desktop** — ⌘Q on macOS, or quit from the system tray on Windows. It
-   rewrites its config on exit.
-2. Open **Settings → Developer → Edit Config** to open `claude_desktop_config.json`.
-3. Merge the `fetch` entry into `mcpServers`, keeping any servers already there:
+1. Open **Cutomize → Developer → Edit Config** to open `claude_desktop_config.json`.
+2. Merge the `fetch` entry into `mcpServers`, keeping any servers already there:
 
    ```json
    {
@@ -51,10 +53,8 @@ plugin's **Connectors** panel but can't start it from there, so it needs adding 
    }
    ```
 
-4. Save and relaunch.
-
-Keep the `mcp<2` pin exactly as written — `mcp-server-fetch` crashes on startup under MCP
-Python SDK 2.0.
+3. Save the file.
+4. **Fully quit Claude Desktop** — ⌘Q on macOS, or quit from the system tray on Windows. Relaunch Claude so it grabs the updated config file.
 
 ## Claude Code
 
